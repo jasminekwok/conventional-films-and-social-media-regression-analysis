@@ -1,0 +1,565 @@
+---
+title: "PSTAT 126 Final Project"
+subtitle: "Regression Analysis on Conventional and Social Media 2014 and 2015 dataset"
+author: "Jasmine Kwok"
+date: "6/11/2020"
+output: 
+  pdf_document:
+    citation_package: null
+    fig_caption: yes
+    highlight: default
+    keep_tex: no
+    latex_engine: pdflatex 
+  html_document: default
+  word_document: default
+fontsize: 11pt
+geometry: margin=1in
+header-includes:
+- \usepackage{amsmath}
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+library(readxl)
+csm_dataset <- read_excel("2014 and 2015 CSM dataset.xlsx")
+csm_dataset_ori<-csm_dataset
+attach(csm_dataset)
+dim(csm_dataset) # 231  14
+
+#check for categorical variables
+# 1. Genre 
+is.factor(Genre) #False 
+# 2.Movie 
+is.factor(Movie) #False
+# 3. Year 
+is.factor(Year) #False
+
+#modifications/cleaning 
+Genre <- as.factor(Genre)
+Year <- as.factor(Year)
+# renaming levels of Genre 
+levels(Genre) <- cbind("Action","Adventure","Drama","Mystery","Erotic","Thriller","Comedy","Romance","Historical fiction","Science fiction","Horror")
+# find out where the missing values are 
+which(is.na(csm_dataset))
+#remove rows with NA 
+csm_dataset <- na.omit(csm_dataset) # no empty values 
+
+# looking through dataset, we see remove 0s from dislikes, comments, likes 
+library(dplyr)
+csm_dataset <- filter(csm_dataset, Dislikes > 0, Likes > 0, Comments > 0, `Aggregate Followers` >0, Screens >0) 
+attach(csm_dataset)
+dim(csm_dataset)# 183  14
+```
+# Abstract 
+
+In recent years, there is a growing interest for analysts and investors to assess the financial risk in film production. This study utilizes multiple linear regression analysis to predict the financial success of films and investigate the relationship between screens and year. The results demonstrate that a possible linear regression model consists of ratings, budget, screens, sequel, and aggregate followers as the predictors. Using this model, we achieved a mean gross income of $76,444,805 for predicting all films and only one film. Further, we found that year has no effect on screens in predicting mean gross income and there is a positive linear relationship between them. 
+  
+# Problem and Motivation
+
+The primary goal of this project is to explore and analyze the gross income for movies in 2014 and 2015 as well as examine the relationship and significance of some explanatory variables. Ultimately, this project aims to develop an optimal regression model to predict the financial success of films in 2014 and 2015. The conventional and social media dataset used in this project is straightforward so individuals with only some basic knowledge on film would be able to comprehend. Readers who are interested or work in the film industry, however, would have better comprehension on this project. 
+
+The film industry is a significant contributor to a country’s economy and a major employer in the United States. Due to the large costs involved in film production, it is crucial for analysts to research and understand major variables which contribute to a film’s commercial and financial success. This project may provide insights into key features contributing to the financial success of films and spark future research to examine relationships between particularly unique explanatory variables in our dataset. This project may also be insightful to film producers to determine which features to focus on during the promotion phase to improve film success. 
+
+# Data
+
+The conventional and social media (CSM) 2014 and 2015 dataset was obtained from UC Irvine Machine Learning Repository. The original source of the data is from Youtube, Twitter, and IMDB (Ahmed, Jahangir, Afzal, Majeed,& Siddiqi, 2015). This dataset was provided by Mehreen Ahmed from the National University of Sciences and Technology, Islamabad, Pakistan (Ahmed et al., 2015). He is also the data collector who utilized the modules, Data Collector and Predictive Engine to obtain the data. Originally, the purpose of this dataset was for predictive analysis on the success of movies using machine learning algorithms (Ahmed et al., 2015). There are a total of 14 features in the dataset with some missing datas. The attributes include movie name, year, genre, budget, number of screens, sequel, ratings, gross income, sentiment score, number of comments, number of dislikes, number of likes, number of views, and aggregate actor followers. The categorical data include movie name and genre while the year belongs to ordinal data. There are a total of 11 features that are numerical data. There are only two unique variables to year which are 2014 and 2015. There are 231 unique variables for movie names and 15 unique variables representing different genres of the movie. This dataset represents only the movies that are within the diverse sources of IMDB, Wikipedia, Youtube, and Twitter (Ahmed et al., 2015). Hence, the data overrepresents American films and underrepresents movies produced and released in other countries.
+
+## Questions of Interest 
+
+1. What is a possible multiple linear regression model that can predict mean gross income of movies released in 2014 and 2015? 
+
+2. What is the estimated mean gross income for all movies and the predicted mean gross income for one movie with average values as their predictors? 
+
+3. What is the relationship between gross income and screens in 2014 and 2015? 
+
+# Regression Methods 
+
+## Outline 
+
+In the beginning of this project, exploratory analysis will be conducted by using scatterplots and added variable plots to observe some relationships that exist within the variables in my dataset. To answer the first question of interest a model selection using various methods such as backwards selection, regsubsets and summary table will be carried out. The influential index plot will be used to determine outliers, high leverage points, and ultimately, influential points. A diagnostics check using residuals and fitted plot and Q-Q plot was conducted to ensure there are no violations to the assumptions: linearity, equal variance, normality, and independence. To resolve the violations, the power transformation method and the box-Cox method will be used. To improve the regression model, the analysis of variance table may be used to determine the usefulness of interaction terms to be added to our model.To answer the second question, the model determined for the first question is used to calculate the confidence interval, prediction interval, and mean gross income. The anova table and scatter plot diagram is used to determine the relationship between mean gross income and screens in 2014 and 2015. 
+
+## Exploratory Analysis
+
+In the beginning of analysis, we used the scatterplots matrix and added variable plots to explore the relationships that exist between the variables. Since there are 13 attributes, only continuous variables were plotted to minimize predictors and ensure our scatterplot matrix is readable. From the scatterplots, there is a positive linear relationship between gross and ratings (Appendix B). There also seem to be a positive linear relationship between gross income and budget. We can observe an exponential relationship between gross income and screens as well as between budget and screens (Appendix B). These clear nonlinear relationships between variables suggests that future transformations on predictors may be needed for linear regression. This is also evidence that the linearity assumption may be violated. Other notable relationships include positive linear relationships between views and likes, views and dislikes, and views and comments. There seems to be a positive relationship between ratings and aggregate followers, and a negative relationship between budget and aggregate followers. From the added-variable plots, two notable predictors are budget and aggregate followers which has a clear positive linear relationship when other predictors are held constant (Appendix B). This suggests that our regression model should include these two predictors as it is useful in explaining gross income.  
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+library(car)
+full.lm <- lm(Gross ~ Year + Ratings + Genre + Budget + Screens + Sequel + Sentiment + Views + Likes + Dislikes + Comments + `Aggregate Followers`, data = csm_dataset) #except for Movie name
+```
+
+## Model Selection 
+
+Given the large number of predictors, it is crucial to minimize our model by only including useful predictors. There are 13 predictors in our dataset which means that there are 8912 ($2^{13}$) possible regression models. To effectively select our model, a backward selection is carried out using the step function. This method iterates procedures to minimize Akaike’s Information Criteria (AIC) and Bayesian Information Criteria (BIC). A backwards model selection in comparison to the forwards selection as it eliminates the possibility of a newly selected predictor having the same or more ability to explain parts of the response that is already explained by another predictor present in the model. We obtained the lowest AIC value as 6563.49, however, using the step function the minimized BIC value is not provided (Appendix C). The two methods selected different regression models. The backwards selection using AIC included 6 predictors, ratings, budget, screens, sequel, dislikes, and aggregate followers, for the response gross income. The model selected using BIC only includes 4 predictors ratings, budget, screens, aggregate followers. It is known that BIC places a higher penalty on the number of parameters due to the weight, so it tends to reward smaller models which is present in our observation.
+
+  An optimal variable selection takes into account coefficient of determination, adjusted R-squared, mean squared error, the two information criteria AIC and BIC, as well as Mallows’ Cp statistic. The step function only captures one criteria which is the information criteria AIC and BIC. Hence, our analysis proceeds by carrying out a regression subsets method (regsubsets) on the first model obtained from backwards selection on AIC which is an exhaustive search on all other possible models based on existing predictors. The regression subsets method was not used prior to this as it is inefficient for our dataset when it has 13 predictors. Looking at the R-squared values, we select the model with the largest increase of 0.0397 which is model 2 that has the R-squared value 0.525 (Appendix D). This model only includes budget and screens as predictors for gross income. The criteria for smallest mean squared error is equivalent to the criteria of largest adjusted R-squared, hence, only one of the criterias has to be checked. The model with the highest adjusted R-squared is model 6 with 0.5878093 (Appendix D). Model 6 is the full model which has all the predictors chosen from the backward selection method. Based on Mallows’ Cp statistic value, our choice would be model 5 which has the value of 8.715 closest to our q value 7(Appendix D). This model excludes dislikes and includes all other predictors. Our last criteria is to check for the model with the lowest Bayesian Information Criteria which was not provided by the step selection method. Similar to the step function, the model with the lowest BIC value of 134.128 is model 4 that includes the exact same predictors ratings, budget, screens, and aggregate followers. Based on all the criterias, the optimal model would be the model which includes the 6 predictors: ratings, budget, screens, sequel, dislikes, and aggregate followers (Appendix D). This is because it satisfies the most criterias, highest adjusted R-squared, lowest mean squared error, and lowest AIC. 
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+mod.0 <- lm(Gross ~ 1, data = csm_dataset) 
+step(full.lm, scope = list(lower = mod.0, upper = full.lm), trace = 0, direction = "backward")
+n<- length(Year)
+n
+step(full.lm, scope = list(lower = mod.0, upper = full.lm), direction = 'backward', k = log(n), trace = 0)
+
+library(leaps)
+csm_models<- regsubsets(Gross ~  Ratings + Budget + Screens + Sequel + Dislikes + `Aggregate Followers`, data = csm_dataset)
+summary.csm<-summary(csm_models)
+
+#picking the best regression model using reg subsets 
+summary.csm$which
+#Criteria
+# model with largest increase in R^2 (equivalent to smallest MSE)
+summary.csm$rsq
+0.5254611-0.4857658
+0.5606424-0.5254611
+# model with largest adjusted R^2 
+summary.csm$adjr2
+# model with smallest Mallow's Cp
+summary.csm$cp
+# model with lowest bic
+summary.csm$bic
+```
+\newpage 
+
+## Summary Table 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE }
+full2.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + Dislikes + `Aggregate Followers`, data = csm_dataset)
+summary(full2.lm)
+```
+
+From the summary table, a global F-test and a partial F-test for each single variable: Ratings (1), Budget (2), Screens (3), Sequel, (4) Dislikes(5), and Aggregate Followers(6).  
+
+1. $H_{0}:B_{1}=0$ vs $H_{1}:B_{1}\not=0$ 
+
+For ratings, the test statistic was -4.825 and p-value was $2.91\times10^{-5}$. The p-value is significantly smaller than any conventional alpha values which indicates a strong evidence against null hypothesis so our decision is to reject the null hypothesis. We can conclude that ratings is a useful predictor for gross income when the predictors, budget, screens, sequel, dislikes, and aggregate followers  are held constant. 
+
+2. $H_{0}:B_{2}=0$ vs $H_{1}:B_{2}\not=0$ 
+
+The p-value of the partial f-test for the budget is $6.13\times10^{-10}$ which is significantly smaller than all alpha values. This suggests a strong evidence against the null hypothesis. Our decision is to reject the null hypothesis where $B_{2}=0$. We can conclude that ratings is a useful predictor for gross income when the predictors, ratings, screens, sequel, dislikes, and aggregate followers  are held constant.
+
+3. $H_{0}:B_{3}=0$ vs $H_{1}:B_{3}\not=0$ 
+
+The p-value of the partial f-test for the screens is $0.000463$ which is significantly smaller than all alpha values. This suggests a strong evidence against the null hypothesis. Our decision is to reject the null hypothesis where $B_{3}=0$. We can conclude that screens is a useful predictor for gross income when all other predictors are held constant. 
+
+
+4. $H_{0}:B_{4}=0$ vs $H_{1}:B_{4}\not=0$
+
+The p-value for sequel is $0.022920$ which is smaller than the alpha value 0.05. This suggests a strong evidence against the null hypothesis. Our decision is to reject the null hypothesis stating $B_{4}=0$. We can conclude that sequel is a useful predictor for gross income when all other predictors are held constant.
+
+5. $H_{0}:B_{5}=0$ vs $H_{1}:B_{5}\not=0$
+
+The p-value of the partial f-test for dislikes is $0.055536$ which is larger than alpha value 0.05, indicating a weak evidence against the null hypothesis. Our decision is to fail to reject the null hypothesis where $B_{5}=0$. We can conclude that dislikes is not a useful predictor for gross income when all other predictors are held constant. However, with alpha at 0.1, we do not have sufficient evidence to reject the null hypothesis since p-value is smaller than alpha. Our decision is to keep this predictor as we would like to check for influential points which may change the significance of our predictors. 
+
+6. $H_{0}:B_{6}=0$ vs $H_{1}:B_{6}\not=0$
+
+The p-value for aggregate followers is $0.006708$ which is smaller than the alpha value 0.05. This suggesting a strong evidence against the null hypothesis so our decision is to reject the null hypothesis stating $B_{6}=0$. We can conclude that aggregate followers is a useful predictor for our model when all other predictors are held constant.
+
+## Global F-test 
+
+$H_{0}:B_{1}=B_{2}=B_{3}=B_{4}=B_{5}=B_{6}=0$ vs $H_{1}:$at least 1 predictor $B_{i}\not=0$ where i = 1,2,3,4,5,6. The p-value for the global F-test is $2.2\times10^{-16}$ which is much smaller than alpha 0.05, suggesting strong evidence against null hypothesis. This means our decision is to reject the null hypothesis. We can conclude that there is at least one useful predictor in our model. 
+
+## Influential Points 
+
+Using the influence index plot, we are able to visualize the candidate points which are outlier and/or high leverage points to determine influential points. The goal of this step is to find and remove the influential points to improve our regression model. Looking at Cook's distance, the candidate points are 130 and 138 (Appendix F). For studentized residuals, the potential outliers are points 10 and 130 (Appendix F). From the hat values, the potential high leverage points are 132 and 138 (Appendix F). Only a few points are selected and removed from the candidates above and they are points 10 and 138 as removing many points at once changes the entire model. By removing the points from the original dataset and constructing another summary table, we are able to determine if the points are influential points.  
+
+  From our original summary table constructed with all the points in our dataset, we obtained residual standard error amount of 60270000, R-squared value of 0.6014 and adjusted R-squared value 0.5878 (Appendix E). This means that 58.78% of variability in gross income is explained by our current regression model. From our new summary table, the residual standard error is 57370000 which is significantly lower than our previous residual value (Appendix F). This means that the errors of prediction in our model is improved. The new R-squared value is 0.6234 and the adjusted R-squared value is 0.6105. This means that 61.05% of the variability in gross income is explained by our current regression model which is better than the original 58.78%. Through this method, we are able to determine that the points 10 and 138 are indeed influential points and should be removed from our model. 
+
+A partial f-test for dislikes was conducted again to determine its usefulness in predicting our model.
+
+    $H_{0}:B_{5}=0$ vs $H_{1}:B_{5}\not=0$
+
+The p-value of the partial f-test is $0.580484$ which is larger than alpha value 0.05 and 0.1 (Appendix F). This suggests weak evidence against the null hypothesis so our decision is to fail to reject the null hypothesis where $B_{5}=0$. We can conclude that dislikes is not a useful predictor for gross income when all other predictors are held constant and remove it from our current regression model. Hence, our current regression model would only include ratings, budget, screens, sequel, and aggregate followers to predict gross income. 
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+#influenceIndexPlot(full2.lm, id=TRUE)
+#remove the two data points 
+removed_dataset1<- csm_dataset[-c(10,138),]
+#removed_dataset2<- csm_dataset[-c(130, 132, 138),]
+full2rm_1.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + Dislikes + `Aggregate Followers`, data = removed_dataset1)
+
+#compare the quadratic mean function 
+summary(full2.lm)
+summary(full2rm_1.lm) #no difference  
+```
+
+## Diagnostic Check 
+
+There are 4 key assumptions for multiple linear regression models: linearity, equal variance, normality, and independence. We assume that independence assumption is satisfied at the stage of data collection since the samples are collected independently using the modules Data Collector and Predictive Engine from diverse sources online. The other three assumptions are checked using the residuals vs fitted plot and Quantile-Quantile plot (Q-Q plot). 
+
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE }
+#CHECKING RESIDUALS VS FITTED AND QQ PLOT
+full3.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + `Aggregate Followers`, data = removed_dataset1)
+
+#residuals vs fitted, Q-Q plot 
+par(mfrow = c(1,2))
+plot(full3.lm, which=1)
+plot(full3.lm,which=2)
+```
+
+  Looking at the residuals vs fitted plot, the points are mostly on the left side of the plot and not well scattered across the plot which violates the linearity assumption. The residuals also formed around the line $e_{i}$ = 0 has a fanning pattern which violates the equal variance assumption. The Q-Q plot shows the right tail is above the y=x line and the left tail is below the y=x line. This indicates that there may be heavy-tailed distribution which violates the normality assumption (Appendix G).
+
+## Transformation 
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+# Do not include categorical variable type 
+Trans.csm1 <- powerTransform(cbind(Ratings,Budget,Screens,Sequel,`Aggregate Followers`)~1,data =removed_dataset1) 
+summary(Trans.csm1)
+
+#Transform and check for if the assumptions are improved 
+csmtrans1.lm <- lm(Gross ~  Ratings + I(Budget**(0.5)) + Screens + I(Sequel**(-4)) +  log(`Aggregate Followers`), data = removed_dataset1)
+
+#TRANSFORMATION ON RESPONSE 
+csmtrans2.lm <-  lm((Gross**(0.5)) ~  Ratings + I(Budget**(0.5)) + Screens + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+```
+
+To resolve violations with non-normality, unequal variances, and nonlinear function, the power transform function is used to determine transformation needed on the predictors and the boxCox function is used to determine a transformation for response. According to the power transform function, we would transform the predictors budget, screens, sequel, and aggregate followers with lambda values 0.24, 0.79, -4.00 , and 0.16 (Appendix H). Lambda value of 1.00 for ratings indicates that no transformation has to be made for this predictor. To simplify future calculations, we round our lambda values to 0.5 , 1, -4.00, and 0 which means that no transformation will be carried out for screens as well. Two likelihood ratio tests are conducted. The first with the null hypothesis states that all the parameters are 0 which test that the transformation for all the predictors is logarithmic (lambda = 0).  The p-value is $2.22\times10^{-16}$ which is significantly smaller than any conventional alpha so our decision is to reject the null hypothesis. This means that not all transformations for the predictor are logarithmic. The second likelihood test states the null hypothesis as all lambda values is one indicating that no transformation is needed for any predictor. The p-value is $2.22\times10^{-16}$ which is significantly smaller than any conventional alpha. Hence, our decision is to reject the null hypothesis. We conclude that it is better to transform the predictors using the lambda values than have no transformation at all. From the boxCox method, we also obtained a rounded optimal lambda value of 0.5 from the graph (Appendix J). We choose this value to simplify future calculations although it is not within the 95% confidence interval as it is the closest rounded value to the peak of the graph. 
+
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE, echo=FALSE}
+#checking the residuals and qqplot
+par(mfrow = c(1,2))
+plot(csmtrans2.lm, which=1)
+plot(csmtrans2.lm,which=2)
+```
+
+  A residuals and fitted plot and Q-Q plot is after the transformations on predictors and response are carried out to check if there are still violations of linearity, equal variance, and normality. From the residuals vs fitted plot, the points are randomly scattered across the plot with no pattern which satisfies linearity assumption. The residuals form a band from 5000 to -5000 around $e_{i}$ = 0 with a few outliers which suggest that there is almost constant variance. Looking at the Q-Q plot, almost all the points fall on the y=x line with a few exceptions. However, real world data is imperfect and this is much better than the previous Q-Q plot. We can conclude that the normality assumption is not violated and all the assumptions for linear regression model are satisfied. 
+  
+## Interaction terms 
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+# Full model 
+full4.lm <- lm((Gross**(0.5)) ~ Ratings + I(Budget**(0.5)) + Screens + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+
+# We are interested in Genre and its interaction with other variables 
+# Budget and Screens 
+full4.1.lm <- lm((Gross**(0.5)) ~  Ratings + I(Budget**(0.5))*Screens + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+anova(full4.lm,full4.1.lm) # no interaction term 
+
+# Budget and Ratings
+full4.2.lm <- lm((Gross**(0.5)) ~  Ratings*I(Budget**(0.5)) + Screens + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+anova(full4.lm,full4.2.lm)
+
+summary(full4.2.lm)
+```
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo=FALSE}
+anova(full4.lm,full4.1.lm) 
+anova(full4.lm,full4.2.lm)
+```
+
+To improve our regression model, the Analysis of Variance Table was used to test for interaction terms between budget and screens, and budget and sequels (Appendix K). 
+
+$H_{0}:B_{32}=0$ vs $H_{1}:B_{32}\not=0$ 
+
+The F value was 0.083 and p-value was 0.7736 which is much larger than alpha value 0.05. This indicates a weak evidence against the null hypothesis so our decision is to fail to reject the null hypothesis which is the reduced model without interaction term.Budget does not seem to interact with screens in its impact on gross income so the interaction term was not useful to explain our regression model with all other predictors held constant. Hence, we should not include it in our model. 
+
+$H_{0}:B_{12}=0$ vs $H_{1}:B_{12}\not=0$ 
+
+The F value was 6.3073 and p-value was 0.0004392 which is much smaller than alpha value 0.05 which is a strong evidence against the null hypothesis. Our decision is to reject the null hypothesis. Budget appears to interact with screens so the interaction term was indeed useful to explain our regression model with all other predictors held constant. By the Hierarchy Principle, budget and ratings $B_{12}$ should also be included in the model whether or not its coefficients are significant as its higher order term $B_{12}$ is statistically significant for our predictor gross income. 
+
+## Final regression model 
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo=FALSE}
+summary(full4.2.lm)
+```
+
+  Looking at the summary table, the coefficient of the intercept $(B_{0})$ is 0.0239. This means that the predicted mean gross income when ratings, budget, screens, sequel, and aggregate followers are 0 is 0.0057 dollars. This is not meaningful as there is no movie produced without budget and other predictors. Hence we should  not include it as we are extrapolating beyond our data. This is further supported by the partial f-test with null hypothesis  $(B_{0})$=0 and alternative hypothesis  $(B_{0})$ not equal to 0. The p-value is 0.925 which is significantly larger than alpha value 0.05. This means the p-value serves as a very weak evidence against null hypothesis. Therefore, our decision is to fail to reject our null hypothesis. We can conclude that the mean gross income when all predictors are 0 is also 0. The adjusted R-squared for our model is 0.697. This indicates that 69.7% of variability in ($Gross Income^{0.5}$) is explained by our regression model with all the predictors collectively. The value of  $(B_{1})$ is 52.11 which means that for one unit increase in ratings, the value of predicted gross income is expected to increase by 2715.45 dollars ($52.11^{2}$) when all other predictors are held constant. The value of  $(B_{2})$ is -0.635 which means that for one unit increase in ($budget^{0.5}$), the value of predicted gross income is expected to decrease by 0.40 dollars(0.635^(2)) when all other predictors are held constant. The value of  $(B_{3})$ is 1.157 which means that for one unit increase in screens, the value of predicted gross income is expected to increase by 1.34 dollars ($1.157^{2}$) when all other predictors are held constant. The value of  $(B_{4})$ is -0.0017 which means that for one unit increase in ($sequel^{-4}$), the value of predicted gross income is expected to decrease by $2.89\times10^{-6}$ (0.0017^(2)) when all other predictors are held constant. The value of  $(B_{5})$ is 18.077 which means that for one unit increase in log(Aggregate Followers), the value of predicted gross income is expected to increase by $325.78$ ($18.077^{2}$) when all other predictors are held constant. The value of  $(B_{6})$ is 0.166 which means that for one unit increase in ratings and budget, the value of predicted gross income is expected to decrease by $0.0276$ ($0.166^{2}$) when all other predictors are held constant.Thus, our final multiple linear regression model is
+
+$(Gross^{0.5})=52.11Ratings-0.635Budget^{0.5}+1.157Screens-0.0017Sequel^{-4}$
+\newline $+18.077log(Aggregate Followers)+0.166Ratings*Budget^{0.5}$
+
+## Prediction interval and Confidence Interval  
+
+  The mean gross income for all movies with the average values of ratings, budget, screens, sequel, and aggregate followers is 76,444,805 dollars (Appendix L). We are 95% confident that the mean gross income for all movies with these average values falls between $64,639,124 and $89,240,103. The predicted mean gross income for one movie with average values is 76,444,805 dollars. We are 95% confident that the predicted gross income for one movie falls between $12,852,576 and $193,251,702 (Appendix L). 
+
+## Relationship between gross income and screens in 2014 and 2015
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo = FALSE, results='hide'}
+# QUESTION 3 
+# We are interested in categorical variables year and genre
+# Year 
+np.csm_year.lm<- lm(log(Gross) ~ Year *Screens, data = csm_dataset)
+par.csm_year.lm<- lm(log(Gross) ~ Year + Screens, data = csm_dataset) 
+# which model is better? 
+anova(par.csm_year.lm,np.csm_year.lm) # parallel model preferred 
+
+yhat <- fitted(par.csm_year.lm)
+yhatA <- yhat[Year == 2014]
+yhatB <- yhat[Year == 2015]
+```
+
+```{r tidy = FALSE, message = FALSE, warning = FALSE, error = FALSE, echo=FALSE}
+plot(Screens, log(Gross), type = 'n', xlab = 'Screens', ylab = 'Gross Income', 
+     main = 'Gross Income vs Screens')
+points(Screens[Year == 2014], log(Gross)[Year == 2014], col = 'blue', lwd=2)
+points(Screens[Year == 2015], log(Gross)[Year == 2015], col = 'red', lwd=2)
+lines(Screens[Year == 2014], yhatA, col = 'blue')
+lines(Screens[Year == 2015], yhatB, col = 'red')
+legend('bottomright', bty = 'n', col = c('blue','red'), c('2014', '2015'), 
+       lty = c(1,1), text.col =c('blue','red'), pch = c(1, 1))
+
+#par.csm_year.lm # Year: 0 - 2014; 1- 2015
+```
+
+  Using the anova table, we are able to conclude that the non-parallel model is preferred to predict mean gross income with screens in 2014 and 2015 (Appendix M). Our null hypothesis represents the reduced model which is the main effects model while the alternative hypothesis represents the full model with interaction terms. The p-value is 0.3595 is larger than alpha 0.05 which indicates a weak evidence against the null hypothesis.This means that the interaction term is not useful in predicting mean gross income and there is no interaction between screens and year. The plot shows a positive linear relationship between screens and gross income. From the scatter plot, it is evident that the regression line for 2014 is above the regression line for 2015 which reflects a greater mean gross income for movies. Again, the absent interaction between the two terms are reflected through the two parallel slopes in the model. On average, movies in 2015 have a lower median gross income by 1.274 ($e^{0.24231}$) 
+
+# Conclusion 
+
+Through regression analysis, a possible multilinear regression model to predict mean gross income of movies has ratings, budget, screens, sequel, and aggregate followers as the predictors. Our results are accurate to a certain extent as the current regression model is only able to explain 69.7% of variability in mean gross income for movies and it does not violate any regression assumptions. The value of the predicted mean gross income for all movies and for one movie is the same which is  $76,444,805. Further, there is a positive linear relationship between gross income, screens, and year, however, year does not have any effect on screens. This data is only generalizable to movies that are released in 2014 and 2015 with a main focus on movies that are produced and released in the United States. One possible extension to this analysis is to analyze the relationship between genres and screens, ratings, and budget. It is also possible to further improve our regression model by checking for other possible candidate outliers and high leverage points present in the dataset to detect and remove influential points.  
+
+# Works Cited 
+
+Ahmed M, Jahangir M, Afzal H, Majeed A, Siddiqi I. Using Crowd-source based features from social media and Conventional features to predict the movies popularity. InSmart City/SocialCom/SustainCom (SmartCity), 2015 IEEE International Conference on 205 Dec 19 (pp. 273-278). IEEE.
+
+
+# Appendix 1: R code 
+
+## Appendix A
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+library(readxl)
+csm_dataset <- read_excel("2014 and 2015 CSM dataset.xlsx")
+csm_dataset_ori<-csm_dataset
+attach(csm_dataset)
+dim(csm_dataset) # 231  14
+
+#check for categorical variables
+# 1. Genre 
+is.factor(Genre) #False 
+# 2.Movie 
+is.factor(Movie) #False
+# 3. Year 
+is.factor(Year) #False
+
+#modifications/cleaning 
+Genre <- as.factor(Genre)
+Year <- as.factor(Year)
+# renaming levels of Genre 
+levels(Genre) <- cbind("Action","Adventure","Drama","Mystery",
+                       "Erotic","Thriller","Comedy","Romance","Historical fiction",
+                       "Science fiction","Horror")
+# find out where the missing values are 
+which(is.na(csm_dataset))
+#remove rows with NA 
+csm_dataset <- na.omit(csm_dataset) # no empty values 
+
+# looking through dataset, we see remove 0s from dislikes, comments, likes 
+library(dplyr)
+csm_dataset <- filter(csm_dataset, Dislikes > 0, Likes > 0, Comments > 0, 
+                      `Aggregate Followers` >0, Screens >0) 
+attach(csm_dataset)
+dim(csm_dataset)# 183  14
+```
+
+## Appendix B
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+# exploratory analysis 
+library(car)
+full.lm <- lm(Gross ~ Year + Ratings + Genre + Budget + Screens + Sequel 
+              + Sentiment + Views + Likes + Dislikes + Comments + 
+                `Aggregate Followers`, data = csm_dataset) #except for Movie name
+#summary(full.lm)
+pairs(Gross ~  Year + Ratings + Budget + Screens + Sentiment + Views 
+      + Likes + Dislikes + Comments + `Aggregate Followers`, data = csm_dataset)
+
+# AVPlots 
+num_data.lm<- lm(Gross ~  Year + Ratings + Budget + Screens + Sentiment 
+                 + Views + Likes + Dislikes + Comments + `Aggregate Followers`, data = csm_dataset)
+avPlots(num_data.lm, id=FALSE)
+```
+
+## Appendix C 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#USING BACKWARDS SELECTION TO FIND THE BEST MODEL/REDUCE PREDICTORS 
+mod.0 <- lm(Gross ~ 1, data = csm_dataset) 
+step(full.lm, scope = list(lower = mod.0, upper = full.lm), 
+     trace = 1, direction = "backward")
+n<- length(Year)
+n
+step(full.lm, scope = list(lower = mod.0, upper = full.lm), 
+     direction = 'backward', k = log(n), trace = 1)
+```
+
+## Appendix D 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+# Since it is only 6 predictors, we can use Regsubsets to conduct exhausitive search.  
+library(leaps)
+csm_models<- regsubsets(Gross ~  Ratings + Budget + Screens + Sequel + 
+                          Dislikes + `Aggregate Followers`, data = csm_dataset)
+summary.csm<-summary(csm_models)
+
+#picking the best regression model using reg subsets 
+summary.csm$which
+#Criteria
+# model with largest increase in R^2 (equivalent to smallest MSE)
+summary.csm$rsq
+0.5254611-0.4857658
+0.5606424-0.5254611
+# model with largest adjusted R^2 
+summary.csm$adjr2
+# model with smallest Mallow's Cp
+summary.csm$cp
+# model with lowest bic
+summary.csm$bic
+```
+
+## Appendix E
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#SUMMARY TABLE 
+full2.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + Dislikes + 
+                 `Aggregate Followers`, data = csm_dataset)
+summary(full2.lm)
+```
+
+## Appendix F 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#CHECKING FOR OUTLIERS
+influenceIndexPlot(full2.lm, id=TRUE)
+
+#remove the two data points 
+removed_dataset1<- csm_dataset[-c(10,138),]
+#removed_dataset2<- csm_dataset[-c(130, 132, 138),]
+full2rm_1.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + Dislikes + 
+                     `Aggregate Followers`, data = removed_dataset1)
+
+#compare the quadratic mean function 
+summary(full2.lm)
+summary(full2rm_1.lm) #no difference  
+```
+
+## Appendix G
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#CHECKING RESIDUALS VS FITTED AND QQ PLOT
+full3.lm <- lm(Gross ~  Ratings + Budget + Screens + Sequel + `Aggregate Followers`
+               , data = removed_dataset1)
+
+#residuals vs fitted, Q-Q plot 
+par(mfrow = c(1,2))
+plot(full3.lm, which=1)
+plot(full3.lm,which=2)
+```
+
+## Appendix H 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#TRANSFORMING PREDICTORS
+# Do not include categorical variable type 
+Trans.csm1 <- powerTransform(cbind(Ratings,Budget,Screens,Sequel,
+                                   `Aggregate Followers`)~1,data =removed_dataset1) 
+summary(Trans.csm1)
+```
+
+## Appendix I 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#Transform and check for if the assumptions are improved 
+csmtrans1.lm <- lm(Gross ~  Ratings + I(Budget**(0.5)) + Screens 
+                   + I(Sequel**(-4)) +  log(`Aggregate Followers`), data = removed_dataset1)
+
+#checking the residuals and qqplot
+plot(csmtrans1.lm, which=1)
+abline(h = 0, lty = 2)
+
+#QQ plot 
+qqnorm(resid(csmtrans1.lm))
+qqline(resid(csmtrans1.lm))
+
+```
+
+## Appendix J 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#TRANSFORMATION ON RESPONSE 
+Trans.csm2 <- boxCox(csmtrans1.lm) 
+
+csmtrans2.lm <-  lm((Gross**(0.5)) ~  Ratings + I(Budget**(0.5)) + Screens 
+                    + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+
+#checking the residuals and qqplot
+plot(csmtrans2.lm, which=1)
+abline(h = 0, lty = 2)
+
+#QQ plot 
+qqnorm(resid(csmtrans2.lm))
+qqline(resid(csmtrans2.lm))
+
+```
+
+## Appendix K 
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+#INTERACTION VARIABLES 
+# Full model 
+full4.lm <- lm((Gross**(0.5)) ~ Ratings + I(Budget**(0.5)) + Screens 
+               + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+
+# We are interested in Genre and its interaction with other variables 
+# Budget and Screens 
+full4.1.lm <- lm((Gross**(0.5)) ~  Ratings + I(Budget**(0.5))*Screens 
+                 + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+anova(full4.lm,full4.1.lm) # no interaction term 
+
+# Budget and Ratings
+# Question 1
+full4.2.lm <- lm((Gross**(0.5)) ~  Ratings*I(Budget**(0.5)) + Screens + I(Sequel**(-4)) + log(`Aggregate Followers`), data = removed_dataset1)
+anova(full4.lm,full4.2.lm)
+
+summary(full4.2.lm)
+```
+
+## Appendix L
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+# Answering Questions of interest 
+attach(removed_dataset1)
+logaf <-log(`Aggregate Followers`)
+full4.2_modified.lm<- lm((Gross**(0.5)) ~  Ratings*I(Budget**(0.5)) + Screens 
+                         + I(Sequel**(-4)) + logaf, data = removed_dataset1)
+logafmean <- log(mean(`Aggregate Followers`))
+
+#mean values for all predictors
+avgvals<- data.frame(Ratings = mean(Ratings), Budget= mean(Budget), Screens= mean(Screens),
+                     Sequel=mean(Sequel), logaf = logafmean)
+
+# QUESTION 2.1
+# confidence interval GrossIncome^(0.5) - for all movies 
+predict(full4.2_modified.lm, avgvals, interval = 'confidence', level = 0.95) 
+# fit = 8743.272 lwr=8039.846 upr= 9446.698
+# convert back to original Yi from transformed response 
+orifit <- 8743.272**2
+# convert the confidence interval 
+ci_lwr <- 8039.846**2
+ci_upr <- 9446.698**2
+c(orifit, ci_lwr, ci_upr)
+
+
+# QUESTION 2.2 
+# prediction interval GrossIncome^(0.5) - for 1 movie
+predict(full4.2_modified.lm, avgvals, interval = 'prediction', level = 0.95)
+# fit = 8743.272 lwr = 3585.049 upr = 13901.5
+# convert the prediction interval 
+pi_lwr <- 3585.049**2
+pi_upr <- 13901.5**2
+c(orifit, pi_lwr, pi_upr)
+```
+
+## Appendix M
+```{r tidy = TRUE, message = FALSE, warning = FALSE, error = FALSE}
+# QUESTION 3 
+# We are interested in categorical variables year and genre
+# Year 
+np.csm_year.lm<- lm(log(Gross) ~ Year *Screens, data = removed_dataset1)
+par.csm_year.lm<- lm(log(Gross) ~ Year + Screens, data = removed_dataset1) 
+# which model is better? 
+anova(par.csm_year.lm,np.csm_year.lm) # parallel model preferred 
+
+yhat <- fitted(par.csm_year.lm)
+yhatA <- yhat[Year == 2014]
+yhatB <- yhat[Year == 2015]
+
+plot(Screens, log(Gross), type = 'n', xlab = 'Screens', ylab = 'Gross Income', 
+     main = 'Gross Income vs Screens')
+points(Screens[Year == 2014], log(Gross)[Year == 2014], col = 'blue', lwd=2)
+points(Screens[Year == 2015], log(Gross)[Year == 2015], col = 'red', lwd=2)
+lines(Screens[Year == 2014], yhatA, col = 'blue')
+lines(Screens[Year == 2015], yhatB, col = 'red')
+legend('bottomright', bty = 'n', col = c('blue','red'), c('2014', '2015'), 
+       lty = c(1,1), text.col =c('blue','red'), pch = c(1, 1))
+
+par.csm_year.lm # Year: 0 - 2014; 1- 2015
+```
