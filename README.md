@@ -1,4 +1,4 @@
-# Regression Analysis Paper 
+# Film Gross Income Predictor
 ## Abstract 
 In recent years, there is a growing interest for analysts and investors to assess the financial risk in film production. This study utilizes multiple linear regression analysis to predict the financial success of films and investigate the relationship between screens and year. The results demonstrate that a possible linear regression model consists of ratings, budget, screens, sequel, and aggregate followers as the predictors. Using this model, we achieved a mean gross income of $76,444,805 for predicting all films and only one film. Further, we found that year has no effect on screens in predicting mean gross income and there is a positive linear relationship between them. 
 
